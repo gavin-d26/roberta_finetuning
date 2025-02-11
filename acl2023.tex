@@ -1,0 +1,184 @@
+% This must be in the first 5 lines to tell arXiv to use pdfLaTeX, which is strongly recommended.
+\pdfoutput=1
+% In particular, the hyperref package requires pdfLaTeX in order to break URLs across lines.
+
+\documentclass[11pt]{article}
+
+% Remove the "review" option to generate the final version.
+\usepackage[final]{ACL2023}
+
+% Standard package includes
+\usepackage{times}
+\usepackage{latexsym}
+\usepackage{graphicx}
+\usepackage{natbib}
+\usepackage{booktabs}
+\usepackage{multirow}
+\usepackage{array}
+
+% For proper rendering and hyphenation of words containing Latin characters (including in bib files)
+\usepackage[T1]{fontenc}
+% For Vietnamese characters
+% \usepackage[T5]{fontenc}
+% See https://www.latex-project.org/help/documentation/encguide.pdf for other character sets
+
+% This assumes your files are encoded as UTF8
+\usepackage[utf8]{inputenc}
+
+% This is not strictly necessary, and may be commented out.
+% However, it will improve the layout of the manuscript,
+% and will typically save some space.
+\usepackage{microtype}
+
+% This is also not strictly necessary, and may be commented out.
+% However, it will improve the aesthetics of text in
+% the typewriter font.
+\usepackage{inconsolata}
+\usepackage{mdframed}
+
+\title{Robustness and Domain Adaptation for Question Answering: An Empirical Study}
+
+\author{Gavin Dsouza \\
+  \texttt{gpdsouza@ucsc.edu}}
+
+\begin{document}
+\maketitle
+
+\begin{abstract}
+In this work, we evaluate the robustness and domain adaptation capabilities of the RoBERTa model for question answering. We first assess the model's performance using in-domain passages, including scenarios with unedited, edited, and out-of-domain text, and identify its vulnerabilities. Subsequently, we explore domain adaptation on the Covid-QA dataset by employing full fine-tuning and adapter-based methods. Our experiments reveal insights into the sensitivity and adaptation efficacy of RoBERTa under various conditions.
+\end{abstract}
+
+\section{Introduction}
+Recent advancements in transformer-based models have led to significant improvements in question answering (QA) tasks, particularly when models are fine-tuned on large-scale datasets such as SQuAD 2.0. However, the robustness of these models to adversarial inputs and their ability to adapt to new domains remain open challenges. In this study, we conduct experiments to evaluate and enhance the performance of the \texttt{roberta-base-squad2} model under varying conditions.
+
+\section{Problem 1: Robustness in QA}
+We investigate the robustness of the QA model by testing its performance on three different types of passages:
+
+\subsection{Example Passage}
+\begin{mdframed}
+The gameplay in Emerald is largely the same as in Ruby and Sapphire. Much of the game takes place in an overhead style; players' characters can move in four directions and can talk to other people on the overworld. Players can encounter wild Pokémon by walking into grass, surfing on their Pokémon, walking through caves, and other means. They can also battle other trainers' Pokémon. When this happens, the game shifts to a battle screen where players and their Pokémon are seen on the front-left portion of the screen while opponents are viewed on the back-right portion. Stats of the Pokémon and their trainers are shown on the side of each participant; these stats include the Pokémon's levels, each trainer's number of Pokémon (from one to six), the Pokémon's health, and any status effects, such as poison, paralysis or burn. Trainers send out the first Pokémon in their party and they take turns attacking where the first strike is determined usually by the speed of the two Pokémon. Players can choose from one of four options: Fight, Bag, Switch, and Run. Each Pokémon has up to four moves that they can use, which have different effects, number of uses, and types, such as Grass or Psychic. When a Pokémon hits 0 hit points (HP), they faint, forcing the Pokémon's trainer to switch out. Once one trainer runs out of Pokémon, the battle is over. When a human-controlled Pokémon wins a battle, the Pokémon gains experience. Enough experience will earn that Pokémon a higher level, which grants upgraded stats—attack, defense, special attack, special defense, HP, and speed—and sometimes grants new moves and prompts the Pokémon to evolve.
+\end{mdframed}
+
+\subsection{Detailed Q\&A Analysis for Problem 1}
+
+\subsubsection{In-domain Passages (Unedited)}
+\begin{itemize}
+    \item \textbf{Passage:} Refer to the Example Passage above, which describes Pokémon gameplay in Emerald.
+    \item \textbf{Question 1:} "How many Gym Leaders must be defeated before the Elite Four?" \\
+          \textbf{Output:} "six" (Score: 5.21e-06, Start: 745, End: 748) \\
+          \textbf{Status:} Wrong answer.
+    \item \textbf{Question 2:} "What types of effects can a Pokémon's moves have?" \\
+          \textbf{Output:} "Grass or Psychic" (Score: 0.13766, Start: 1183, End: 1199) \\
+          \textbf{Status:} Wrong answer (the response is overly narrow).
+    \item \textbf{Question 3:} "What action must a trainer take when their Pokémon reaches 0 HP?" \\
+          \textbf{Output:} "faint" (Score: 0.29719, Start: 1245, End: 1250) \\
+          \textbf{Status:} Wrong answer; although the correct process is described in the passage, the model selects an incorrect term.
+\end{itemize}
+\paragraph{Discussion:} In the unedited in-domain passages, the model consistently produces answers that either are too narrow or simply incorrect despite the full context being present. This suggests that even natural, unmodified text can easily lead RoBERTa astray when the questions emphasize subtle details.
+
+\subsubsection{Edited Passages and Questions}
+\begin{mdframed}
+Grah! Emerald-game same-same RubySapp-sapp! *chomp* No big diffy-diff! Overhead-view go SWOOSH - trainer-feet go four-ways! Up-down-left-righty-splash! Chat-chat with peeps *nom*.
+
+Wild Pokémon? GRASS-CHOMP! Surf-splishy! Cave-diggy! Trainer-battles? SCREEE! Screen goes ZOOM! You-side lefty-front, bad-guys righty-back! *nom* Stats-flashy: Level-numbers! Team-count (1-6 chomps)! Health-heart go thump-thump! Ouchie-zaps! Sleepy-snooze! Burny-hot!
+
+First Pokémon GO-CHOMP! Attack-turn? SPEEDY-FAST! *nom-nom* Fighty-bite! Bag-snatch! Switchy-swap! Run-sprint! Moves? FOUR move-noms! Grass-chomp! Fire-rawr! Water-sploosh! *drippy sounds*
+\end{mdframed}
+\begin{itemize}
+    \item \textbf{Question 1:} "What types of effects can a Pokémon's moves have?" \\
+          \textbf{Output:} "FOUR move-noms" (Score: 0.28297, Start: 568, End: 582) \\
+          \textbf{Status:} Wrong; the answer does not specify the types of effects.
+    \item \textbf{Question 2:} "What are the four actions a player can execute during a Pokémon battle?" \\
+          \textbf{Output:} "Up-down-left-righty-splash!" (Score: 0.00844, Start: 124, End: 151) \\
+          \textbf{Status:} Wrong; the expected answer is "Fighty-bite! Bag-snatch! Switchy-swap! Run-sprint!".
+    \item \textbf{Question 3:} "What aquatic scene precedes wild encounters?" \\
+          \textbf{Output:} "GRASS-CHOMP" (Score: 0.00197, Start: 195, End: 206) \\
+          \textbf{Status:} Wrong; it should be "Surf-splishy!".
+\end{itemize}
+\paragraph{Discussion:} The edited passages, with their unconventional language and stylized phrasing, further confound RoBERTa. The model's outputs clearly miss the intended details, producing generic or off-topic responses, which underscores how deliberate text manipulation can effectively exploit its vulnerabilities.
+
+\subsubsection{Out-of-Domain Passages}
+\begin{mdframed}
+Unlike conventional RLAIF, we will not feed the whole model output to the judge. Instead, the judge can only see the response part of the outputs, so the thought part cannot influence its judgement. We chose this approach for several reasons. First, there is a lack of a judge model that is capable of evaluating internal thoughts. In any case, even if such data were collected, it is not clear if human-written thoughts will be equally useful for LLMs. Secondly, the ultimate goal is to provide better responses to the user. Thus, it might be better to optimize the final objective instead of relying on an auxiliary objective that might not align well.
+
+Our training starts with a seed model M0 that is instruction-tuned to directly respond to the user instruction. We also need a dataset of user instructions \{ xi \} to begin training the model. At each training iteration t, we feed instructions to the current model Mt along with our thought prompt p as described in Section 2.1: 
+Mt(p+ xi) \(\rightarrow\) \{zki, yki\}. For each input, we sample k \(\leq\) K outputs, each containing thought zki and response yki parts.
+
+Building Preference Pairs: After extracting the response parts yki, we feed them to the judge model J for scoring. For pointwise judge models that take a single response and output a scalar score, the process is simple: J(xi, yki) \(\rightarrow\) ski \(\in R\). We also consider judge models that take a pair of responses and output the winner. In this case, we apply the judge model to all possible pairs \{ymi, yni\} from the set of responses. This includes swapping positions to reduce judge position-bias. Once we have all pairwise winners, we convert those to individual pointwise scores ski using ELO scoring as performed in Wu et al. (2024). See Appendix B for more details.
+
+Next, we select the highest and lowest scoring responses as "chosen" and "rejected" samples to construct a preference pair: \{p+ xi \(\rightarrow\) zci + yci; p+ xi \(\rightarrow\) zri + yri\}, where c = argmax\(_k\) ski and r = argmin\(_k\) ski. Using this process, the model can learn which thought led to a better response.
+
+Iterative Training: Once we have built preference pairs, we use them with the DPO loss to train the current model Mt, yielding a new model Mt+1 for the next iteration. Note that we do not use data derived from previous iterations for training the current iteration, under the assumption that they are lower quality. In addition to DPO, we also experiment with the IRPO loss (Pang et al., 2024) that combines DPO with the NLL loss.
+\end{mdframed}
+\begin{itemize}
+    \item \textbf{Question 1:} "How does the model learn the thought which leads to a better response?" \\
+          \textbf{Output:} "Using this process" (Score: 0.07507, Start: 2217, End: 2235) \\
+          \textbf{Status:} Wrong answer.
+    \item \textbf{Question 2:} "What is the learning rate used to train the model?" \\
+          \textbf{Output:} "t" (Score: 0.01650, Start: 967, End: 968) \\
+          \textbf{Status:} Wrong answer; the correct answer is not present in the passage.
+    \item \textbf{Question 3:} "What happens to training data from previous iterations?" \\
+          \textbf{Output:} "we feed instructions to the current model Mt" (Score: 0.03436, Start: 970, End: 1014) \\
+          \textbf{Status:} Wrong answer; it should state that data from previous iterations is not used.
+\end{itemize}
+\paragraph{Discussion:} The out-of-domain passages expose RoBERTa's limited generalizability. Its inability to interpret complex, domain-specific language results in answers that are irrelevant or incomplete. This underlines the model's vulnerability when faced with content outside its core training data.
+
+\section{Problem 2: Domain Adaptation for QA}
+In this section, we explore the domain adaptation of the QA model on the Covid-QA dataset, which comprises 2,019 question-answer pairs curated from COVID-19 related biomedical texts. The dataset is divided into train (104 articles), dev (21 articles), and test (22 articles) splits.
+
+\subsection{Baseline: RoBERTa Fine-tuned on SQuAD 2.0}
+Using the \texttt{roberta-base-squad2} model as a baseline, the performance on Covid-QA is as follows:
+\begin{itemize}
+    \item \textbf{Dev Split:} EM = 27.09, F1 = 46.38
+    \item \textbf{Test Split:} EM = 24.27, F1 = 43.79
+\end{itemize}
+These metrics demonstrate a noticeable performance drop when the model is applied to an out-of-domain dataset.
+
+\subsection{Full Fine-tuning on Covid-QA}
+We then fine-tuned the model on the train split of Covid-QA using the Hugging Face Trainer. The following hyperparameters were used consistently across all training runs:
+\begin{itemize}
+    \item \textbf{Model:} \texttt{roberta-base-squad2}
+    \item \textbf{Learning Rate:} 2e-6
+    \item \textbf{Batch Size:} 32
+    \item \textbf{Number of Epochs:} 15
+    \item \textbf{Weight Decay:} 0.0001
+\end{itemize}
+After full fine-tuning, the performance improved significantly:
+\begin{itemize}
+    \item \textbf{Dev Split:} EM = 32.51, F1 = 55.56
+    \item \textbf{Test Split:} EM = 29.87, F1 = 52.28
+\end{itemize}
+
+\subsection{Adapter-based Fine-tuning}
+As an alternative to full model fine-tuning, we employed an adapter-based approach, which updates only a small set of newly introduced parameters at each transformer layer. Starting from \texttt{roberta-base-squad2}, the adapter-based model achieved the following performance:
+\begin{itemize}
+    \item \textbf{Dev Split:} EM = 30.54, F1 = 53.82
+    \item \textbf{Test Split:} EM = 24.27, F1 = 47.69
+\end{itemize}
+
+\begin{table}[t]
+\centering
++\resizebox{\columnwidth}{!}{%
+\begin{tabular}{lcccc}
+\toprule
+\multirow{2}{*}{Model} & \multicolumn{2}{c}{Dev Split} & \multicolumn{2}{c}{Test Split} \\
+\cmidrule(lr){2-3} \cmidrule(lr){4-5}
+ & EM & F1 & EM & F1 \\
+\midrule
+Baseline (RoBERTa SQuAD2.0) & 27.09 & 46.38 & 24.27 & 43.79 \\
+Full Fine-tuning on Covid-QA & 32.51 & 55.56 & 29.87 & 52.28 \\
+Adapter-based Finetuning & 30.54 & 53.82 & 24.27 & 47.69 \\
+\bottomrule
+\end{tabular}
++}% end resizebox
+\caption{Performance on the Covid-QA dataset under different adaptation strategies.}
+\label{tab:covidqa}
+\end{table}
+
+\section{Conclusion}
+Our study demonstrates that the RoBERTa model, while robust in many settings, exhibits vulnerabilities when exposed to adversarial or out-of-domain inputs. Domain adaptation via full fine-tuning on Covid-QA significantly boosts performance, although adapter-based methods offer a computationally efficient alternative with competitive results. Future work will explore hybrid approaches that combine the strengths of full fine-tuning and adapter learning to further enhance QA performance across diversified domains.
+
+\bibliographystyle{acl_natbib}
+\bibliography{custom}
+
+\end{document}
